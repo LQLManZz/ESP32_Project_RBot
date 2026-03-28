@@ -1,4 +1,7 @@
-/*
+/**
+ * @file interactive_faces.cpp
+ * @brief Implementation of functions to control OLED expressions.
+ *
  * This file uses the Adafruit SSD1306 library to initialize and display
  * simple textual "faces" on an I2C OLED screen.
  */
@@ -12,17 +15,21 @@
 #define SCREEN_WIDTH 128
 #define SCREEN_HEIGHT 64
 
+// Animation variables
+unsigned long lastBlinkTime = 0;
+int blinkState = 0; // 0, 1, or 2 to track the animation frame
+
 // Create an instance of the display object with screen dimensions and I2C setup
 // -1 means no shared reset pin is used
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 /**
- * Initializes the OLED display and shows a startup message.
+ * @brief Initializes the OLED display and shows a startup message.
  * Sets up I2C communication and checks for display connectivity.
  */
 void initDisplay()
 {
-    // Initialize the screen using its I2C address (usually 0x3C)
+    // Initialize the screen using its I2C address (0x3C)
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {
         // Log failure message if OLED fails to start
@@ -41,41 +48,92 @@ void initDisplay()
 }
 
 /**
- * @brief Updates the OLED screen to display a specific expression.
- * @param mood The desired facial expression as a String (e.g., "happy", "sad").
+ * @brief Clears the screen and draws a textual face.
+ * @param text The characters representing the face.
  */
-void showFace(String mood)
+void drawFaceText(String text)
 {
-    // Clear the display for the new expression
     display.clearDisplay();
     display.setCursor(35, 20);
     display.setTextSize(3); // Set large text size for the "face" characters
+    display.print(text);
+    // Important: display.display() is called in showFace() after this function returns
+}
 
+/**
+ * @brief Creates a sequential animation by cycling through three mood states.
+ * @param state1 First animation frame.
+ * @param state2 Second animation frame.
+ * @param state3 Third animation frame.
+ */
+void makeMotion(String state1, String state2, String state3)
+{
+    unsigned long currentMillis = millis(); // Get the current time in milliseconds
+
+    // Check if it's time to change to the next animation frame (every 500ms)
+    if (currentMillis - lastBlinkTime > 500)
+    {
+        lastBlinkTime = currentMillis; // Update the last transition time
+
+        // Cycle through states 0, 1, 2
+        blinkState = (blinkState + 1) % 3;
+    }
+
+    // Draw the current state's face text based on blinkState
+    if (blinkState == 0)
+    {
+        drawFaceText(state1);
+    }
+    else if (blinkState == 1)
+    {
+        drawFaceText(state2);
+    }
+    else if (blinkState == 2)
+    {
+        drawFaceText(state3);
+    }
+}
+
+/**
+ * @brief Updates the OLED screen to display a specific expression or animation.
+ * @param mood The desired facial expression or animation (e.g., "smileblink").
+ */
+void showFace(String mood)
+{
     // Map mood strings to character-based facial expressions
     if (mood == "happy")
     {
-        display.print("^_^");
+        drawFaceText("^_^");
     }
     else if (mood == "sad")
     {
-        display.print("T_T");
+        drawFaceText("T_T");
     }
     else if (mood == "alert")
     {
-        display.print("O_O");
+        drawFaceText("O_O");
     }
     else if (mood == "neutral")
     {
-        display.print("._.");
+        drawFaceText("._.");
+    }
+    else if (mood == "smileblink")
+    {
+        makeMotion(">vO", "OvO", "Ov<");
+    }
+    else if (mood == "talking")
+    {
+        makeMotion("^o^", "^O^", "O_O");
     }
     else
     {
         // Default fallback if the command is unrecognized
+        display.clearDisplay();
         display.setTextSize(1);
         display.setCursor(0, 20);
-        display.print("Unrecognized: " + mood);
+        display.print("Unknown mood: " + mood);
     }
 
-    // Commit changes to the physical display
+    // Final call to update the physical display screen
     display.display();
 }

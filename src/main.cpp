@@ -1,11 +1,21 @@
-/* This file handles the main Arduino setup and loop, listening for serial
- * commands to update the robot's facial expressions.
+/**
+ * @file main.cpp
+ * @brief Entry point for the ESP32 RBot interactive face controller.
+ *
+ * This file handles the main Arduino setup and loop. It continuously updates
+ * the OLED display based on the last received command from the serial port.
  */
 
 #include <Arduino.h>
 #include "../include/interactive_faces.h"
 
-// Initializes serial communication and the OLED display.
+// Global variable to store the current facial expression/mood
+String currentMood = "neutral";
+
+/**
+ * @brief Standard Arduino setup function.
+ * Initializes serial communication and the OLED display.
+ */
 void setup()
 {
   // Initialize Serial at 115200 baud for debugging and command input
@@ -13,20 +23,31 @@ void setup()
 
   // Initialize the OLED display screen
   initDisplay();
+
+  // Show the initial face
+  showFace(currentMood);
 }
 
-/* Continuously checks for incoming serial commands to change the face.
+/**
+ * @brief Standard Arduino loop function.
+ * Continuously listens for new commands and updates the screen animation.
  */
 void loop()
 {
-  // Check if there is data available in the serial buffer
+  // Check if there is data available in the serial buffer to change the mood
   if (Serial.available() > 0)
   {
     // Read the incoming string until a newline character
     String command = Serial.readStringUntil('\n');
     command.trim(); // Remove any leading or trailing whitespace
 
-    // Update the display based on the received command (e.g., "happy", "sad")
-    showFace(command);
+    // Only update if the command is not empty
+    if (command.length() > 0)
+    {
+      currentMood = command;
+    }
   }
+
+  // Continuously update the face
+  showFace(currentMood);
 }
