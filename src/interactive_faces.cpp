@@ -9,7 +9,7 @@
  */
 
 #include "../include/interactive_faces.h"
-#include "../include/bitmaps.h"
+#include "../include/faces_bitmaps.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
@@ -80,23 +80,6 @@ void initDisplay()
     display.setCursor(20, 20);           // Position the text cursor
     display.print("System OK");          // Write text to the buffer
     display.display();                   // Commit the buffer to the physical screen
-}
-
-/**
- * @brief Renders a text-based facial expression centered on the screen.
- *
- * This function handles the "textual" moods (like happy/sad) by clearing the
- * buffer and drawing large characters.
- *
- * @param text The String containing the facial symbols (e.g., "O_O").
- */
-void drawFaceText(String text)
-{
-    display.clearDisplay();    // Remove previous frame contents
-    display.setCursor(35, 20); // Set position for centered appearance
-    display.setTextSize(3);    // Use large text size for high visibility
-    display.print(text);       // Render the characters into the buffer
-    // Note: display.display() is called in showFace() to push this to the screen.
 }
 
 /**
@@ -175,10 +158,6 @@ void showFace(String mood)
     }
     else if (mood == "neutral")
     {
-        makeMotion(neutral_face, neutral_face_totalFrames, mood);
-    }
-    else if (mood == "neutral")
-    {
         // Trigger the multi-frame bitmap animation for the neutral expression.
         // The bitmaps and frame count are defined in bitmaps.h.
         makeMotion(neutral_face, neutral_face_totalFrames, mood);
@@ -190,9 +169,7 @@ void showFace(String mood)
         display.clearDisplay();
         display.setTextSize(1);
         display.setCursor(0, 20);
-        display.print("Error: Unknown Mood");
-        display.setCursor(0, 40);
-        display.print("[" + mood + "]");
+        display.print("Whatchu mean " + mood + " ??");
     }
 
     // Final push to ensure any changes in the buffer are reflected on the OLED.
