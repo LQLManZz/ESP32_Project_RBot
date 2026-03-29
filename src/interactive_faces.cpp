@@ -1,139 +1,200 @@
 /**
  * @file interactive_faces.cpp
- * @brief Implementation of functions to control OLED expressions.
+ * @brief Logic and implementation for OLED-based facial expressions and animations.
  *
- * This file uses the Adafruit SSD1306 library to initialize and display
- * simple textual "faces" on an I2C OLED screen.
+ * This file manages the Adafruit_SSD1306 display instance and provides high-level
+ * functions to render both static text-based "faces" and frame-by-frame bitmap
+ * animations. It handles timing for animations using a non-blocking millis()
+ * approach and manages memory-efficient bitmap storage via PROGMEM.
  */
 
 #include "../include/interactive_faces.h"
+#include "../include/bitmaps.h"
 #include <Wire.h>
 #include <Adafruit_GFX.h>
 #include <Adafruit_SSD1306.h>
 
-// Screen dimensions for standard 128x64 OLED displays
+/**
+ * @def SCREEN_WIDTH
+ * @brief The horizontal resolution of the OLED display in pixels.
+ */
 #define SCREEN_WIDTH 128
+
+/**
+ * @def SCREEN_HEIGHT
+ * @brief The vertical resolution of the OLED display in pixels.
+ */
 #define SCREEN_HEIGHT 64
 
-// Animation variables
-unsigned long lastBlinkTime = 0;
-int blinkState = 0; // 0, 1, or 2 to track the animation frame
+/**
+ * @var currentFrame
+ * @brief Tracks the index of the current bitmap frame being displayed in an animation loop.
+ */
+int currentFrame = 0;
 
-// Create an instance of the display object with screen dimensions and I2C setup
-// -1 means no shared reset pin is used
+/**
+ * @var lastFrameTime
+ * @brief Stores the timestamp (in milliseconds) of when the last animation frame was rendered.
+ * Used to calculate the delay between frames for smooth animation.
+ */
+unsigned long lastFrameTime = 0;
+
+/**
+ * @var lastMood
+ * @brief Keeps track of the previous mood string to detect when a user changes the command.
+ * This allows the animation system to reset to the first frame when a new mood is selected.
+ */
+String lastMood = "";
+
+/**
+ * @brief The display driver instance.
+ *
+ * Configured for a 128x64 screen using the Wire (I2C) library.
+ * The '-1' parameter indicates that the OLED does not have a dedicated reset pin connected to the ESP32.
+ */
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 /**
- * @brief Initializes the OLED display and shows a startup message.
- * Sets up I2C communication and checks for display connectivity.
+ * @brief Initializes the OLED hardware and communication bus.
+ *
+ * This function attempts to start the I2C communication with the SSD1306 controller.
+ * If the display is not found (usually due to wiring or incorrect I2C address),
+ * it prints an error to the Serial monitor and halts the program.
  */
 void initDisplay()
 {
-    // Initialize the screen using its I2C address (0x3C)
+    // Initialize the SSD1306 display using the internal charge pump (SSD1306_SWITCHCAPVCC)
+    // The standard I2C address for these modules is 0x3C.
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {
-        // Log failure message if OLED fails to start
-        Serial.println(F("SSD1306 OLED allocation failed"));
+        // If the display doesn't respond, we cannot proceed.
+        Serial.println(F("CRITICAL ERROR: SSD1306 OLED not found. Check wiring/address."));
         for (;;)
-            ; // Enter an infinite loop to halt execution
+            ; // Infinite loop to prevent further execution
     }
 
-    // Clear the screen buffer and show a "System OK" message
-    display.clearDisplay();
-    display.setTextSize(2);
-    display.setTextColor(SSD1306_WHITE); // Use SSD1306_WHITE for compatibility
-    display.setCursor(20, 20);
-    display.print("System OK");
-    display.display(); // Push the buffer content to the screen
+    // Prepare the screen with a basic "Ready" message
+    display.clearDisplay();              // Wipe the internal buffer
+    display.setTextSize(2);              // Set text scale (2x original size)
+    display.setTextColor(SSD1306_WHITE); // Set pixel color to white (on)
+    display.setCursor(20, 20);           // Position the text cursor
+    display.print("System OK");          // Write text to the buffer
+    display.display();                   // Commit the buffer to the physical screen
 }
 
 /**
- * @brief Clears the screen and draws a textual face.
- * @param text The characters representing the face.
+ * @brief Renders a text-based facial expression centered on the screen.
+ *
+ * This function handles the "textual" moods (like happy/sad) by clearing the
+ * buffer and drawing large characters.
+ *
+ * @param text The String containing the facial symbols (e.g., "O_O").
  */
 void drawFaceText(String text)
 {
-    display.clearDisplay();
-    display.setCursor(35, 20);
-    display.setTextSize(3); // Set large text size for the "face" characters
-    display.print(text);
-    // Important: display.display() is called in showFace() after this function returns
+    display.clearDisplay();    // Remove previous frame contents
+    display.setCursor(35, 20); // Set position for centered appearance
+    display.setTextSize(3);    // Use large text size for high visibility
+    display.print(text);       // Render the characters into the buffer
+    // Note: display.display() is called in showFace() to push this to the screen.
 }
 
 /**
- * @brief Creates a sequential animation by cycling through three mood states.
- * @param state1 First animation frame.
- * @param state2 Second animation frame.
- * @param state3 Third animation frame.
+ * @brief Manages timed frame transitions for bitmap animations.
+ *
+ * This is the core animation engine. It uses non-blocking logic to check if
+ * enough time has passed to show the next frame. It also handles reading
+ * bitmap data from Program Memory (PROGMEM).
+ *
+ * @param moodFrameArray An array of pointers to the individual frame bitmaps.
+ * @param totalFrame The number of frames in the provided animation array.
+ * @param mood The current mood string, used to detect if the animation needs a reset.
  */
-void makeMotion(String state1, String state2, String state3)
+void makeMotion(const unsigned char *const moodFrameArray[], int totalFrame, String mood)
 {
-    unsigned long currentMillis = millis(); // Get the current time in milliseconds
+    unsigned long currentMillis = millis(); // Get elapsed time since startup
 
-    // Check if it's time to change to the next animation frame (every 500ms)
-    if (currentMillis - lastBlinkTime > 500)
+    // Logic for State Reset:
+    // If the mood has changed since the last call, reset the animation to frame 0.
+    if (mood != lastMood)
     {
-        lastBlinkTime = currentMillis; // Update the last transition time
-
-        // Cycle through states 0, 1, 2
-        blinkState = (blinkState + 1) % 3;
+        currentFrame = 0;  // Start at the beginning of the new animation
+        lastMood = mood;   // Update the state tracker
+        lastFrameTime = 0; // Force the first frame to render immediately
     }
 
-    // Draw the current state's face text based on blinkState
-    if (blinkState == 0)
+    // Non-blocking Timer Logic:
+    // Check if 200 milliseconds have passed since the last frame was rendered.
+    if (currentMillis - lastFrameTime > 200)
     {
-        drawFaceText(state1);
-    }
-    else if (blinkState == 1)
-    {
-        drawFaceText(state2);
-    }
-    else if (blinkState == 2)
-    {
-        drawFaceText(state3);
+        lastFrameTime = currentMillis; // Update the timestamp for the next cycle
+
+        display.clearDisplay(); // Prepare buffer for the new frame
+
+        // Memory Access Logic:
+        // Since moodFrameArray is an array of pointers stored in PROGMEM,
+        // we must use pgm_read_ptr to retrieve the actual memory address of the bitmap.
+        const unsigned char *bitmap = (const unsigned char *)pgm_read_ptr(&moodFrameArray[currentFrame]);
+
+        // Rendering Logic:
+        // The bitmaps are 77x64px.
+        // To center horizontally on a 128px screen: (128 - 77) / 2 = 25.5 -> 25.
+        // parameters: (x, y, bitmap_data, width, height, color)
+        display.drawBitmap(25, 0, bitmap, 77, 64, SSD1306_WHITE);
+
+        display.display(); // Update physical screen with the new bitmap frame
+
+        // Loop Management:
+        // Move to the next frame index. Reset to 0 if we've reached the end of the array.
+        currentFrame++;
+        if (currentFrame >= totalFrame)
+        {
+            currentFrame = 0;
+        }
     }
 }
 
 /**
- * @brief Updates the OLED screen to display a specific expression or animation.
- * @param mood The desired facial expression or animation (e.g., "smileblink").
+ * @brief High-level dispatcher that maps mood strings to specific rendering actions.
+ *
+ * This is the main interface used by main.cpp. It decides whether to draw
+ * static text or trigger a bitmap animation sequence based on the input mood.
+ *
+ * @param mood The command string received via Serial (e.g., "happy", "neutral").
  */
 void showFace(String mood)
 {
-    // Map mood strings to character-based facial expressions
-    if (mood == "happy")
+    // Check the mood string and execute the corresponding drawing logic
+    if (mood == "angry")
     {
-        drawFaceText("^_^");
+        makeMotion(angry_face, angry_face_totalFrames, mood);
     }
-    else if (mood == "sad")
+    else if (mood == "sus")
     {
-        drawFaceText("T_T");
-    }
-    else if (mood == "alert")
-    {
-        drawFaceText("O_O");
+        makeMotion(sus_face, sus_face_totalFrames, mood);
     }
     else if (mood == "neutral")
     {
-        drawFaceText("._.");
+        makeMotion(neutral_face, neutral_face_totalFrames, mood);
     }
-    else if (mood == "smileblink")
+    else if (mood == "neutral")
     {
-        makeMotion(">vO", "OvO", "Ov<");
-    }
-    else if (mood == "talking")
-    {
-        makeMotion("^o^", "^O^", "O_O");
+        // Trigger the multi-frame bitmap animation for the neutral expression.
+        // The bitmaps and frame count are defined in bitmaps.h.
+        makeMotion(neutral_face, neutral_face_totalFrames, mood);
     }
     else
     {
-        // Default fallback if the command is unrecognized
+        // Error handling for unrecognized commands:
+        // Clear the screen and display the received "unknown" string for debugging.
         display.clearDisplay();
         display.setTextSize(1);
         display.setCursor(0, 20);
-        display.print("Unknown mood: " + mood);
+        display.print("Error: Unknown Mood");
+        display.setCursor(0, 40);
+        display.print("[" + mood + "]");
     }
 
-    // Final call to update the physical display screen
+    // Final push to ensure any changes in the buffer are reflected on the OLED.
     display.display();
 }
