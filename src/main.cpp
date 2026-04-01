@@ -11,6 +11,7 @@
  */
 
 #include "../include/interactive_faces.h"
+#include "../include/interactive_voices.h"
 
 /**
  * @var currentMood
@@ -23,6 +24,7 @@
  * Default: "neutral" (Triggering the bitmap animation)
  */
 String currentMood = "neutral";
+String currentMoodforVoice = "neutral";
 
 /**
  * @brief System setup and peripheral initialization.
@@ -38,6 +40,7 @@ void setup()
    * Usage: Debugging output and receiving mood commands from a PC or another MCU.
    */
   Serial.begin(115200);
+  Serial.setTimeout(10);
 
   /**
    * Initialize the OLED Display.
@@ -45,6 +48,7 @@ void setup()
    * verify the screen is responding.
    */
   initDisplay();
+  initVoice();
 
   /**
    * Draw the initial face.
@@ -89,6 +93,7 @@ void loop()
     if (command.length() > 0)
     {
       currentMood = command;
+      currentMoodforVoice = command;
 
       /**
        * Feedback:
@@ -100,6 +105,10 @@ void loop()
     }
   }
 
+  // Prove Core 1 is handling the UI
+  Serial.print("[DISPLAY] Drawing animation on CORE: ");
+  Serial.println(xPortGetCoreID());
+
   /**
    * Step 2: Refresh the Display
    *
@@ -110,4 +119,9 @@ void loop()
    *   the bitmap frames.
    */
   showFace(currentMood);
+  if (currentMoodforVoice.length() > 0)
+  {
+    speakSentence(currentMoodforVoice);
+    currentMoodforVoice = "";
+  }
 }
