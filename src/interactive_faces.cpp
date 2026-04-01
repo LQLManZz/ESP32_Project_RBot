@@ -1,11 +1,11 @@
 /**
  * @file interactive_faces.cpp
- * @brief Logic and implementation for OLED-based facial expressions and animations.
+ * @brief Logic va thuc thi cho cac bieu cam khuon mat va hoat anh dua tren OLED.
  *
- * This file manages the Adafruit_SSD1306 display instance and provides high-level
- * functions to render both static text-based "faces" and frame-by-frame bitmap
- * animations. It handles timing for animations using a non-blocking millis()
- * approach and manages memory-efficient bitmap storage via PROGMEM.
+ * Tep nay quan ly thuc the hien thi Adafruit_SSD1306 va cung cap cac ham cap cao
+ * de hien thi ca "khuon mat" dua tren van ban tinh va hoat anh bitmap tung khung hinh.
+ * No xu ly thoi gian cho hoat anh bang cach su dung cach tiep can millis() khong nghen
+ * va quan ly viec luu tru bitmap tiet kiem bo nho thong qua PROGMEM.
  */
 
 #include "../include/interactive_faces.h"
@@ -16,120 +16,124 @@
 
 /**
  * @def SCREEN_WIDTH
- * @brief The horizontal resolution of the OLED display in pixels.
+ * @brief Do phan giai ngang cua man hinh OLED tinh bang pixel.
  */
 #define SCREEN_WIDTH 128
 
 /**
  * @def SCREEN_HEIGHT
- * @brief The vertical resolution of the OLED display in pixels.
+ * @brief Do phan giai doc cua man hinh OLED tinh bang pixel.
  */
 #define SCREEN_HEIGHT 64
 
 /**
  * @var currentFrame
- * @brief Tracks the index of the current bitmap frame being displayed in an animation loop.
+ * @brief Theo doi chi so cua khung hinh bitmap hien tai dang duoc hien thi trong vong lap hoat anh.
  */
 int currentFrame = 0;
 
 /**
  * @var lastFrameTime
- * @brief Stores the timestamp (in milliseconds) of when the last animation frame was rendered.
- * Used to calculate the delay between frames for smooth animation.
+ * @brief Luu tru dau thoi gian (tinh bang miligiay) khi khung hinh hoat anh cuoi cung duoc ve.
+ * Duoc su dung de tinh toan do tre giua cac khung hinh cho hoat anh muot ma.
  */
 unsigned long lastFrameTime = 0;
 
 /**
  * @var lastMood
- * @brief Keeps track of the previous mood string to detect when a user changes the command.
- * This allows the animation system to reset to the first frame when a new mood is selected.
+ * @brief Theo doi chuoi tam trang truoc do de phat hien khi nguoi dung thay doi lenh.
+ * Dieu nay cho phep he thong hoat anh reset ve khung hinh dau tien khi mot tam trang moi duoc chon.
  */
 String lastMood = "";
 
 /**
- * @brief The display driver instance.
+ * @brief Thuc the trinh dieu khien hien thi.
  *
- * Configured for a 128x64 screen using the Wire (I2C) library.
- * The '-1' parameter indicates that the OLED does not have a dedicated reset pin connected to the ESP32.
+ * Duoc cau hinh cho man hinh 128x64 su dung thu vien Wire (I2C).
+ * Tham so '-1' cho biet OLED khong co chan reset rieng biet ket noi voi ESP32.
  */
 Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
 
 /**
- * @brief Initializes the OLED hardware and communication bus.
+ * @brief Khoi tao phan cung OLED va bus giao tiep.
  *
- * This function attempts to start the I2C communication with the SSD1306 controller.
- * If the display is not found (usually due to wiring or incorrect I2C address),
- * it prints an error to the Serial monitor and halts the program.
+ * Ham nay co gang bat dau giao tiep I2C voi bo dieu khien SSD1306.
+ * Neu khong tim thay man hinh (thuong do day dan hoac dia chi I2C sai),
+ * no se in thong bao loi ra Serial monitor va dung chuong trinh.
  */
 void initDisplay()
 {
-    // Initialize the SSD1306 display using the internal charge pump (SSD1306_SWITCHCAPVCC)
-    // The standard I2C address for these modules is 0x3C.
+    // Khoi tao man hinh SSD1306 su dung bom dien noi bo (SSD1306_SWITCHCAPVCC)
+    // Dia chi I2C tieu chuan cho cac module nay la 0x3C.
     if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C))
     {
-        // If the display doesn't respond, we cannot proceed.
-        Serial.println(F("CRITICAL ERROR: SSD1306 OLED not found. Check wiring/address."));
+        // Neu man hinh khong phan hoi, chung ta khong the tiep tuc.
+        Serial.println(F("OLED SSD1306 not found!"));
         for (;;)
-            ; // Infinite loop to prevent further execution
+            ; // Vong lap vo han de ngan thuc thi them
     }
 
-    // Prepare the screen with a basic "Ready" message
-    display.clearDisplay();              // Wipe the internal buffer
-    display.setTextSize(2);              // Set text scale (2x original size)
-    display.setTextColor(SSD1306_WHITE); // Set pixel color to white (on)
-    display.setCursor(20, 20);           // Position the text cursor
-    display.print("System OK");          // Write text to the buffer
-    display.display();                   // Commit the buffer to the physical screen
+    // Chuan bi man hinh voi thong bao "Ready" co ban
+    display.clearDisplay();              // Xoa bo dem noi bo
+    display.setTextSize(2);              // Dat kich thuoc van ban (gap 2 lan kich thuoc goc)
+    display.setTextColor(SSD1306_WHITE); // Dat mau pixel thanh trang (bat)
+    display.setCursor(20, 20);           // Dat vi tri con tro van ban
+    display.print("System OK");          // Viet van ban vao bo dem
+    display.display();                   // Cap nhat bo dem len man hinh vat ly
 }
 
 /**
- * @brief Manages timed frame transitions for bitmap animations.
+ * @brief Quan ly viec chuyen doi khung hinh theo thoi gian cho hoat anh bitmap.
  *
- * This is the core animation engine. It uses non-blocking logic to check if
- * enough time has passed to show the next frame. It also handles reading
- * bitmap data from Program Memory (PROGMEM).
+ * Day la cong cu hoat anh cot loi. No su dung logic khong nghen de kiem tra xem
+ * da du thoi gian de hien thi khung hinh tiep theo chua. No cung xu ly viec doc
+ * du lieu bitmap tu Bo nho chuong trinh (PROGMEM).
  *
- * @param moodFrameArray An array of pointers to the individual frame bitmaps.
- * @param totalFrame The number of frames in the provided animation array.
- * @param mood The current mood string, used to detect if the animation needs a reset.
+ * @param moodFrameArray Mot mang cac con tro den cac bitmap khung hinh rieng le.
+ * @param totalFrame So luong khung hinh trong mang hoat anh duoc cung cap.
+ * @param mood Chuoi tam trang hien tai, duoc su dung de phat hien neu hoat anh can reset.
  */
 void makeMotion(const unsigned char *const moodFrameArray[], int totalFrame, String mood)
 {
-    unsigned long currentMillis = millis(); // Get elapsed time since startup
+    unsigned long currentMillis = millis(); // Lay thoi gian da troi qua ke tu khi khoi dong
 
-    // Logic for State Reset:
-    // If the mood has changed since the last call, reset the animation to frame 0.
+    // Logic de Reset trang thai:
+    // Neu tam trang da thay doi ke tu lan goi cuoi cung, reset hoat anh ve khung hinh 0.
     if (mood != lastMood)
     {
-        currentFrame = 0;  // Start at the beginning of the new animation
-        lastMood = mood;   // Update the state tracker
-        lastFrameTime = 0; // Force the first frame to render immediately
+        currentFrame = 0;  // Bat dau tai thoi diem bat dau cua hoat anh moi
+        lastMood = mood;   // Cap nhat trinh theo doi trang thai
+        lastFrameTime = 0; // Buoc khung hinh dau tien phai hien thi ngay lap tuc
     }
 
-    // Non-blocking Timer Logic:
-    // Check if 200 milliseconds have passed since the last frame was rendered.
+    // Logic Bo dem thoi gian khong nghen:
+    // Kiem tra xem 200 miligiay da troi qua ke tu khi khung hinh cuoi cung duoc ve chua.
     if (currentMillis - lastFrameTime > 200)
     {
-        lastFrameTime = currentMillis; // Update the timestamp for the next cycle
+        lastFrameTime = currentMillis; // Cap nhat dau thoi gian cho chu ky tiep theo
 
-        display.clearDisplay(); // Prepare buffer for the new frame
+        display.clearDisplay(); // Chuan bi bo dem cho khung hinh moi
 
-        // Memory Access Logic:
-        // Since moodFrameArray is an array of pointers stored in PROGMEM,
-        // we must use pgm_read_ptr to retrieve the actual memory address of the bitmap.
+        // Logic Truy cap Bo nho:
+        // Vi moodFrameArray la mot mang cac con tro duoc luu tru trong PROGMEM,
+        // chung ta phai su dung pgm_read_ptr de lay dia chi bo nho thuc cua bitmap.
         const unsigned char *bitmap = (const unsigned char *)pgm_read_ptr(&moodFrameArray[currentFrame]);
 
-        // Rendering Logic:
-        // The bitmaps are 77x64px.
-        // To center horizontally on a 128px screen: (128 - 77) / 2 = 25.5 -> 25.
-        // parameters: (x, y, bitmap_data, width, height, color)
+        // Logic Hien thi:
+        // Cac bitmap co kich thuoc 77x64px.
+        // De can giua ngang tren man hinh 128px: (128 - 77) / 2 = 25.5 -> 25.
+        // tham so: (x, y, bitmap_data, width, height, color)
         display.drawBitmap(25, 0, bitmap, 77, 64, SSD1306_WHITE);
 
-        display.display(); // Update physical screen with the new bitmap frame
+        display.display(); // Cap nhat man hinh vat ly voi khung hinh bitmap moi
 
-        // Loop Management:
-        // Move to the next frame index. Reset to 0 if we've reached the end of the array.
+        // Quan ly Vong lap:
+        // Chuyen sang chi so khung hinh tiep theo. Reset ve 0 neu chung ta da den cuoi mang.
         currentFrame++;
+
+        // Serial.print("Frame hien tai: ");
+        // Serial.println(currentFrame);
+
         if (currentFrame >= totalFrame)
         {
             currentFrame = 0;
@@ -138,16 +142,16 @@ void makeMotion(const unsigned char *const moodFrameArray[], int totalFrame, Str
 }
 
 /**
- * @brief High-level dispatcher that maps mood strings to specific rendering actions.
+ * @brief Bo dieu phoi cap cao anh xa cac chuoi tam trang den cac hanh dong hien thi cu the.
  *
- * This is the main interface used by main.cpp. It decides whether to draw
- * static text or trigger a bitmap animation sequence based on the input mood.
+ * Day la giao dien chinh duoc su dung boi main.cpp. No quyet dinh nen ve
+ * van ban tinh hay kich hoat chuoi hoat anh bitmap dua tren tam trang dau vao.
  *
- * @param mood The command string received via Serial (e.g., "happy", "neutral").
+ * @param mood Lenh chuoi nhan duoc qua Serial (vi du: "happy", "neutral").
  */
 void showFace(String mood)
 {
-    // Check the mood string and execute the corresponding drawing logic
+    // Kiem tra chuoi tam trang va thuc hien logic ve tuong ung
     if (mood == "angry")
     {
         makeMotion(angry_face, angry_face_totalFrames, mood);
@@ -158,20 +162,24 @@ void showFace(String mood)
     }
     else if (mood == "neutral")
     {
-        // Trigger the multi-frame bitmap animation for the neutral expression.
-        // The bitmaps and frame count are defined in bitmaps.h.
+        // Kich hoat hoat anh bitmap nhieu khung hinh cho bieu cam trung tinh.
+        // Cac bitmap va so luong khung hinh duoc dinh nghia trong bitmaps.h.
+        makeMotion(neutral_face, neutral_face_totalFrames, mood);
+    }
+    else if (mood == "rizz")
+    {
         makeMotion(neutral_face, neutral_face_totalFrames, mood);
     }
     else
     {
-        // Error handling for unrecognized commands:
-        // Clear the screen and display the received "unknown" string for debugging.
+        // Xu ly loi cho cac lenh khong xac dinh:
+        // Xoa man hinh va hien thi chuoi "unknown" nhan duoc de go loi.
         display.clearDisplay();
         display.setTextSize(1);
         display.setCursor(0, 20);
         display.print("Whatchu mean " + mood + " ??");
     }
 
-    // Final push to ensure any changes in the buffer are reflected on the OLED.
+    // Day cuoi cung de dam bao moi thay doi trong bo dem deu duoc phan chieu tren OLED.
     display.display();
 }

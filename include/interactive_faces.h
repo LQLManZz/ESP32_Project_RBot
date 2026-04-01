@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-// Declare the functions that main.cpp is allowed to call
+// Khai bao cac ham ma main.cpp co the goi de dieu khien khuon mat
 void initDisplay();
 void showFace(String mood);
 

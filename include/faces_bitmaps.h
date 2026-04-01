@@ -1,14 +1,28 @@
+/**
+ * @file faces_bitmaps.h
+ * @brief Bo suu tap du lieu bitmap cho cac bieu cam khuon mat robot.
+ * 
+ * Tep nay chua du lieu pixel tho cho cac bieu cam khuon mat khac nhau cua RBot.
+ * Tat ca cac bitmap duoc luu tru trong bo nho Flash (PROGMEM) de tiet kiem SRAM cua ESP32.
+ * Cac bitmap duoc thiet ke cho vung pixel 77x64 tren man hinh OLED SSD1306 128x64.
+ * 
+ * Cac khung hinh hoat anh duoc nhom vao cac mang de de dang lay chi so va phat trong
+ * cong cu hoat anh interactive_faces.cpp.
+ */
+
 #ifndef BITMAPS_H
 #define BITMAPS_H
 
 #include <Arduino.h>
 
 /**
- * @file bitmaps.h
- * @brief Contains bitmap arrays for OLED animations.
+ * @brief Cac khung hinh hoat anh bieu cam trung tinh (77x64px).
+ * 
+ * Chuoi nay dai dien cho trang thai nghi mac dinh cua robot.
+ * No bao gom 6 khung hinh hien thi hieu ung nhay mat nhe hoac "tho".
  */
 
-// 'neutral_face_1', 77x64px
+// 'neutral_face_1', 77x64px - Khung hinh 1: Mat mo hoan toan
 const unsigned char neutral_face_1[] PROGMEM = {
     0x1f, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xff, 0xc0, 0x20, 0x00, 0x00, 0x00, 0x00, 0x00,
     0x00, 0x00, 0x00, 0x20, 0x40, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x00, 0x10, 0x40, 0x00,

@@ -3,7 +3,7 @@
 
 #include <Arduino.h>
 
-// Declare the functions that main.cpp can use
+// Khai bao cac ham ma main.cpp co the dung de dieu khien giong noi
 void initVoice();
 void speakSentence(String text);
 

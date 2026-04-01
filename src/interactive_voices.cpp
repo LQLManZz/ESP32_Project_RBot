@@ -2,40 +2,40 @@
 #include <AudioOutputI2S.h>
 #include <ESP8266SAM.h>
 
-// Pointers for the audio output and the speech synthesizer
+// Con tro cho dau ra am thanh va bo tong hop giong noi
 AudioOutputI2S *out;
 ESP8266SAM *sam;
 
-// 1. Define the internal queue handle
+// 1. Dinh nghia handle cho hang doi noi bo
 QueueHandle_t audioQueue;
 
-// 2. Define the background task for Core 0
+// 2. Dinh nghia nhiem vu nen cho Core 0
 void audioTask(void *parameter)
 {
     char sentenceToSpeak[100];
 
     for (;;)
     {
-        // Wait patiently for a message to appear in the queue
+        // Kien nhanh cho doi mot tin nhan xuat hien trong hang doi
         if (xQueueReceive(audioQueue, &sentenceToSpeak, portMAX_DELAY))
         {
 
-            // 1. Tell the Watchdog to stop monitoring Core 0
+            // 1. Yeu cau Watchdog ngung theo doi Core 0
             disableCore0WDT();
 
-            // Prove Core 0 is doing the math
-            Serial.print("[AUDIO] Synthesizing voice on CORE: ");
+            // Chung minh Core 0 dang thuc hien tinh toan
+            Serial.print("[AUDIO] Dang tong hop giong noi tren CORE: ");
             Serial.println(xPortGetCoreID());
 
-            // 2. Do the heavy math to generate the voice
+            // 2. Thuc hien tinh toan de tao ra giong noi
             sam->Say(out, sentenceToSpeak);
 
-            // Returns the number of BYTES left in the task's memory buffer
+            // Tra ve so luong BYTE con lai trong bo dem bo nho cua nhiem vu
             UBaseType_t remainingMemory = uxTaskGetStackHighWaterMark(NULL);
-            Serial.print("[CORE 0] Memory bytes remaining: ");
+            Serial.print("[CORE 0] Bo nho con lai (bytes): ");
             Serial.println(remainingMemory);
 
-            // 3. Turn the Watchdog back on now that we are done
+            // 3. Bat lai Watchdog sau khi hoan tat
             enableCore0WDT();
         }
     }
@@ -43,29 +43,29 @@ void audioTask(void *parameter)
 
 void initVoice()
 {
-    // 1. Initialize the I2S hardware output
+    // 1. Khoi tao dau ra phan cung I2S
     out = new AudioOutputI2S();
 
-    // 2. Route the I2S signals to specific ESP32 pins
-    // Parameters: BCLK (Clock), LRC (Word Select), DOUT (Data Out)
+    // 2. Tuyet duong cac tin hieu I2S den cac chan ESP32 cu the
+    // Tham so: BCLK (Clock), LRC (Word Select), DOUT (Data Out)
     out->SetPinout(26, 25, 27);
 
-    // Set the volume to 10% (0.1) to prevent power spikes.
-    // The scale goes from 0.0 to 1.0
-    out->SetGain(0.1);
+    // Dat am luong thanh 75% (0.75) de ngan chan su tang vot nang luong.
+    // Thang do tu 0.0 den 1.0
+    out->SetGain(0.75);
 
-    // 3. Turn on the output stream
+    // 3. Bat luong dau ra
     out->begin();
 
-    // 4. Initialize the Text-to-Speech engine
+    // 4. Khoi tao cong cu Chuyen van ban thanh giong noi (TTS)
     sam = new ESP8266SAM();
 
-    Serial.println("Audio system initialized on pins 25, 26, 27.");
+    Serial.println("He thong am thanh duoc khoi tao tren cac chan 25, 26, 27.");
 
-    // Create the mailbox queue (holds up to 5 sentences of 100 characters max)
+    // Tao hang doi hop thu (chua toi da 5 cau, moi cau toi da 100 ky tu)
     audioQueue = xQueueCreate(5, sizeof(char[100]));
 
-    // Start the dedicated audio task on Core 0
+    // Bat dau nhiem vu am thanh chuyen dung tren Core 0
     xTaskCreatePinnedToCore(
         audioTask,
         "AudioTask",
@@ -73,47 +73,43 @@ void initVoice()
         NULL,
         1,
         NULL,
-        0 // Pinned to Core 0
+        0 // Gan vao Core 0
     );
 
-    Serial.println("Audio system and Core 0 task initialized.");
+    Serial.println("He thong am thanh va nhiem vu Core 0 da duoc khoi tao.");
 }
 
 void speakSentence(String mood)
 {
-    // Convert the Arduino String into a standard C character array
-    char msg[100];
+    // Chuyen doi chuoi Arduino String thanh mang ky tu C tieu chuan
+    char msg[150];
 
     if (mood == "neutral")
     {
-        String text = "Hello World.";
-        text.toCharArray(msg, 100);
-        // Drop the message into the queue so Core 0 can pick it up.
-        // Core 1 moves on immediately after this line!
-        xQueueSend(audioQueue, &msg, 0);
+        String text = "Hello my friend. What do you want me to do.";
+        text.toCharArray(msg, 150);
+        // Dua tin nhan vao hang doi de Core 0 co the tiep nhan.
+        // Core 1 se tiep tuc thuc thi ngay lap tuc sau dong nay!
     }
     else if (mood == "sus")
     {
         String text = "What is that.";
-        text.toCharArray(msg, 100);
-        // Drop the message into the queue so Core 0 can pick it up.
-        // Core 1 moves on immediately after this line!
-        xQueueSend(audioQueue, &msg, 0);
+        text.toCharArray(msg, 150);
     }
     else if (mood == "angry")
     {
         String text = "You want to play. Let's play.";
-        text.toCharArray(msg, 100);
-        // Drop the message into the queue so Core 0 can pick it up.
-        // Core 1 moves on immediately after this line!
-        xQueueSend(audioQueue, &msg, 0);
+        text.toCharArray(msg, 150);
+    }
+    else if (mood == "rizz")
+    {
+        String text = "Hey baby. You look sick. Suck my dick. Now";
+        text.toCharArray(msg, 150);
     }
     else
     {
         String text = "The fuck you want.";
-        text.toCharArray(msg, 100);
-        // Drop the message into the queue so Core 0 can pick it up.
-        // Core 1 moves on immediately after this line!
-        xQueueSend(audioQueue, &msg, 0);
+        text.toCharArray(msg, 150);
     }
+    xQueueSend(audioQueue, &msg, 0);
 }
