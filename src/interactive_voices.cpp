@@ -50,9 +50,9 @@ void initVoice()
     // Tham so: BCLK (Clock), LRC (Word Select), DOUT (Data Out)
     out->SetPinout(26, 25, 27);
 
-    // Dat am luong thanh 75% (0.75) de ngan chan su tang vot nang luong.
+    // Dat am luong thanh de ngan chan su tang vot nang luong.
     // Thang do tu 0.0 den 1.0
-    out->SetGain(0.75);
+    out->SetGain(0.3);
 
     // 3. Bat luong dau ra
     out->begin();
@@ -86,19 +86,19 @@ void speakSentence(String mood)
 
     if (mood == "neutral")
     {
-        String text = "Hello my friend. What do you want me to do.";
+        String text = "Hello my friend";
         text.toCharArray(msg, 150);
         // Dua tin nhan vao hang doi de Core 0 co the tiep nhan.
         // Core 1 se tiep tuc thuc thi ngay lap tuc sau dong nay!
     }
     else if (mood == "sus")
     {
-        String text = "What is that.";
+        String text = "What is that";
         text.toCharArray(msg, 150);
     }
     else if (mood == "angry")
     {
-        String text = "You want to play. Let's play.";
+        String text = "Am I a joke to you ?";
         text.toCharArray(msg, 150);
     }
     else if (mood == "rizz")
@@ -106,9 +106,14 @@ void speakSentence(String mood)
         String text = "Hey baby. You look sick. Suck my dick. Now";
         text.toCharArray(msg, 150);
     }
+    else if (mood == "cry")
+    {
+        String text = "Alright. I'm crying";
+        text.toCharArray(msg, 150);
+    }
     else
     {
-        String text = "The fuck you want.";
+        String text = "What the fuck you mean " + mood;
         text.toCharArray(msg, 150);
     }
     xQueueSend(audioQueue, &msg, 0);

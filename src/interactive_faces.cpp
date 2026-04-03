@@ -107,8 +107,8 @@ void makeMotion(const unsigned char *const moodFrameArray[], int totalFrame, Str
     }
 
     // Logic Bo dem thoi gian khong nghen:
-    // Kiem tra xem 200 miligiay da troi qua ke tu khi khung hinh cuoi cung duoc ve chua.
-    if (currentMillis - lastFrameTime > 200)
+    unsigned long frameTime = rand() % 301 + 200;
+    if (currentMillis - lastFrameTime > frameTime)
     {
         lastFrameTime = currentMillis; // Cap nhat dau thoi gian cho chu ky tiep theo
 
@@ -169,6 +169,10 @@ void showFace(String mood)
     else if (mood == "rizz")
     {
         makeMotion(neutral_face, neutral_face_totalFrames, mood);
+    }
+    else if (mood == "cry")
+    {
+        makeMotion(cry_face, cry_face_totalFrames, mood);
     }
     else
     {

@@ -107,7 +107,6 @@ void loop()
    * Buoc 2: Lam moi man hinh
    *
    * Goi 'showFace' tren moi vong lap duy nhat.
-   * - Neu tam trang la tinh (nhu "happy"), no ve lai cac ky tu tuong tu.
    * - Neu tam trang la hoat anh (nhu "neutral"), 'showFace' uy quyen cho
    *   'makeMotion', ham nay tu quan ly thoi gian noi bo (200ms) de cap nhat
    *   cac khung hinh bitmap.
